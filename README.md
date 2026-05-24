@@ -3,7 +3,7 @@
 
 ---
 
-## TL;DR
+## TL:DR
 
 A Python CLI that handles inbound customer enquiries for an aesthetics clinic end-to-end across four stages: FAQ answering, lead qualification, escalation detection, and conversation summary.
 
