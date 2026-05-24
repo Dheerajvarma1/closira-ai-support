@@ -104,6 +104,74 @@ Edit `sop.json` to update the clinic. The AI picks up changes on the next run - 
 
 > The AI returns structured JSON on every turn. Stage, escalation state, and qualification data are embedded in each response - no separate classifier call is needed.
 
+### Conversation Flow
+
+```mermaid
+flowchart TD
+    A([Customer Message]) --> B{Escalation\nTrigger?}
+
+    B -- Complaint / Anger --> ESC
+    B -- Medical Question --> ESC
+    B -- Price Negotiation --> ESC
+    B -- Human Requested --> ESC
+    B -- No Trigger --> C{Qualification\nStep?}
+
+    C -- qa_step = 1 --> Q1[Collect Name + Contact]
+    C -- qa_step = 2 --> Q2[Collect Service Interest]
+    C -- qa_step = 3 --> Q3[Collect Urgency]
+    C -- qa_step = 0 --> D{In SOP?}
+
+    Q1 --> NXT[Ask Next\nQualification Q]
+    Q2 --> NXT
+    Q3 --> WRAP[Wrap Up]
+
+    D -- Yes --> ANS[Answer from SOP]
+    D -- No --> GAP{2nd Unanswered\nGap?}
+
+    GAP -- No --> ACK[Acknowledge Gap\nunanswered_count + 1]
+    GAP -- Yes --> ESC
+
+    ANS --> FAQ2{faq_count >= 1?}
+    FAQ2 -- Yes --> QUAL[Transition to\nQualification]
+    FAQ2 -- No --> LOOP[Continue FAQ]
+
+    ACK --> LOOP
+
+    ESC([Escalate\nLog Reason]) --> SUM
+    WRAP --> SUM([Generate\nStructured Summary])
+
+    LOOP --> A
+    NXT --> A
+    QUAL --> A
+```
+
+### Component Architecture
+
+```mermaid
+graph TD
+    SOP["sop.json\nOnly knowledge source"]
+
+    subgraph main.py
+        SESSION["SupportSession\nchat() / generate_summary()"]
+        EXTRACT["extract_json()\nparse model output"]
+        CLI["main()\nCLI loop"]
+    end
+
+    subgraph Client Selection
+        MOCK["MockAI\nmock_client.py\nRule-based, zero cost"]
+        REAL["Anthropic Claude\nclaude-haiku-4-5-20251001"]
+    end
+
+    SOP --> SESSION
+    CLI --> SESSION
+    SESSION --> EXTRACT
+    SESSION -- "no API key" --> MOCK
+    SESSION -- "ANTHROPIC_API_KEY set" --> REAL
+    MOCK --> EXTRACT
+    REAL --> EXTRACT
+    EXTRACT --> SESSION
+```
+
 **Stage 1 - FAQ Answering**
 ```
 Customer message arrives
